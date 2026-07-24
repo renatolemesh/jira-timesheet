@@ -1,0 +1,12 @@
+services:
+  jira-dashboard:
+    build: .
+    container_name: jira-dashboard
+    ports:
+      - "8000:8000"
+    # Opcional: credenciais fixas para pular a tela de login (uso pessoal).
+    # Sem .env o app funciona normalmente com a tela de login.
+    env_file:
+      - path: .env
+        required: false
+    restart: unless-stopped

@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Apontamentos Jira</title>
+<link rel="stylesheet" href="/static/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9201;</text></svg>">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <h1>Apontamentos <span class="accent">Jira</span></h1>
+    <div class="topbar-right">
+      <span id="last-update" class="muted"></span>
+      <button id="btn-refresh" class="btn ghost" title="Buscar dados novos no Jira (ignora cache)">&#8635; Atualizar</button>
+      <span id="who" class="muted"></span>
+      <button id="btn-logout" class="btn ghost" hidden title="Esquecer as credenciais salvas neste navegador">Sair</button>
+    </div>
+  </div>
+</header>
+
+<div class="filters" id="filters">
+  <div class="filter-presets" id="presets">
+    <button class="chip" data-preset="today">Hoje</button>
+    <button class="chip" data-preset="week">Esta semana</button>
+    <button class="chip active" data-preset="month">Este m&ecirc;s</button>
+    <button class="chip" data-preset="last-month">M&ecirc;s passado</button>
+    <button class="chip" data-preset="30d">&Uacute;ltimos 30 dias</button>
+  </div>
+  <div class="filter-row">
+    <label class="field">
+      <span>In&iacute;cio</span>
+      <input type="date" id="f-start">
+    </label>
+    <label class="field">
+      <span>Fim</span>
+      <input type="date" id="f-end">
+    </label>
+    <div class="field dropdown" id="dd-users">
+      <span>Pessoas</span>
+      <button class="dd-toggle" id="dd-users-toggle">Todas</button>
+      <div class="dd-panel" id="dd-users-panel"></div>
+    </div>
+    <div class="field dropdown" id="dd-projects">
+      <span>Projetos</span>
+      <button class="dd-toggle" id="dd-projects-toggle">Todos</button>
+      <div class="dd-panel" id="dd-projects-panel"></div>
+    </div>
+    <label class="field small">
+      <span>Horas/dia esperadas</span>
+      <input type="number" id="f-expected" value="8" min="1" max="24" step="0.5">
+    </label>
+    <button class="btn primary" id="btn-apply">Aplicar</button>
+  </div>
+</div>
+
+<nav class="tabs">
+  <button class="tab active" data-tab="dashboard">Dashboard</button>
+  <button class="tab" data-tab="worklogs">Apontamentos</button>
+  <button class="tab" data-tab="missing">Sem apontamento</button>
+</nav>
+
+<main>
+  <div id="error-banner" class="error-banner" hidden></div>
+  <div id="loading" class="loading" hidden>Carregando dados do Jira&hellip;</div>
+
+  <!-- ===== Dashboard ===== -->
+  <section id="tab-dashboard" class="tab-content">
+    <div class="tiles" id="tiles"></div>
+    <div class="card">
+      <div class="card-head">
+        <h2 id="chart-days-title">Horas por dia</h2>
+        <div class="legend" id="legend-days"></div>
+      </div>
+      <div id="chart-days" class="chart"></div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-head"><h2>Horas por pessoa</h2></div>
+        <div id="chart-users" class="hbars"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>Horas por projeto</h2></div>
+        <div id="chart-projects" class="hbars"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>Horas por task</h2></div>
+      <div class="table-wrap"><table id="table-issues"></table></div>
+    </div>
+  </section>
+
+  <!-- ===== Apontamentos ===== -->
+  <section id="tab-worklogs" class="tab-content" hidden>
+    <div class="card">
+      <div class="card-head">
+        <h2>Apontamentos <span id="wl-count" class="muted"></span></h2>
+        <div class="card-tools">
+          <input type="search" id="wl-search" placeholder="Filtrar por task, texto, pessoa&hellip;">
+          <button class="btn ghost" id="btn-csv">&#8595; Exportar CSV</button>
+        </div>
+      </div>
+      <div class="table-wrap"><table id="table-worklogs"></table></div>
+    </div>
+  </section>
+
+  <!-- ===== Sem apontamento ===== -->
+  <section id="tab-missing" class="tab-content" hidden>
+    <p class="muted" id="missing-scope"></p>
+    <div id="missing-users"></div>
+    <div class="card">
+      <div class="card-head">
+        <h2>Tasks mexidas no per&iacute;odo sem apontamento do respons&aacute;vel <span id="nw-count" class="muted"></span></h2>
+        <div class="card-tools">
+          <div class="filter-presets" id="nw-status" style="margin:0">
+            <button class="chip active" data-cat="">Todas</button>
+            <button class="chip" data-cat="indeterminate">Em andamento</button>
+            <button class="chip" data-cat="new">A fazer</button>
+            <button class="chip" data-cat="done">Conclu&iacute;das</button>
+          </div>
+          <input type="search" id="nw-search" placeholder="Filtrar por task, pessoa, projeto&hellip;">
+        </div>
+      </div>
+      <p class="card-note muted">Issues atualizadas no per&iacute;odo cujo respons&aacute;vel n&atilde;o registrou nenhum tempo nelas &mdash; candidatas a apontamento esquecido.</p>
+      <div class="table-wrap"><table id="table-noworklog"></table></div>
+    </div>
+  </section>
+</main>
+
+<div id="login-overlay" class="login-overlay" hidden>
+  <form class="login-card" id="login-form">
+    <h1>Apontamentos <span class="accent">Jira</span></h1>
+    <p class="muted">Conecte com sua conta do Jira Cloud. As credenciais ficam salvas <b>somente neste navegador</b> (localStorage) e s&atilde;o enviadas apenas ao servidor local.</p>
+    <label class="field"><span>URL do Jira</span>
+      <input id="l-url" placeholder="https://sua-empresa.atlassian.net" required>
+    </label>
+    <label class="field"><span>E-mail</span>
+      <input id="l-email" type="email" placeholder="voce@empresa.com.br" required>
+    </label>
+    <label class="field"><span>API token</span>
+      <input id="l-token" type="password" required>
+    </label>
+    <p class="muted">Gere um token em <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank" rel="noopener">id.atlassian.com &rarr; Security &rarr; API tokens</a>.</p>
+    <div id="login-error" class="error-banner" hidden></div>
+    <button class="btn primary" type="submit" id="login-btn">Entrar</button>
+  </form>
+</div>
+
+<div id="tooltip" class="tooltip" hidden></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
