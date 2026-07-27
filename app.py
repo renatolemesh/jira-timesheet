@@ -8,7 +8,9 @@ um .env ao lado deste script funciona como fallback opcional.
 Rodar:  python app.py   (ou: uvicorn app:app --reload)
 """
 
+import csv
 import hashlib
+import io
 import os
 import threading
 import time
@@ -16,7 +18,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -455,6 +457,198 @@ def api_missing(
         "users": users_out,
         "issuesWithoutWorklog": issues_out,
     }
+
+
+# ---------- exportacao (CSV / Excel) ----------
+
+
+def fmt_br(iso: str) -> str:
+    y, m, d = iso.split("-")
+    return f"{d}/{m}/{y}"
+
+
+def fmt_hm(seconds: int) -> str:
+    h, m = seconds // 3600, (seconds % 3600) // 60
+    return f"{h}h{m:02d}" if m else f"{h}h"
+
+
+# (chave, rotulo, extrator) — a ordem aqui define a ordem das colunas
+EXPORT_FIELDS = [
+    ("data", "Data", lambda e: fmt_br(e["date"])),
+    ("hora", "Hora", lambda e: (e.get("started") or "")[11:16]),
+    ("projeto", "Projeto", lambda e: e["projectName"]),
+    ("task", "Task", lambda e: e["issueKey"]),
+    ("resumo", "Resumo", lambda e: e["summary"]),
+    ("tipo", "Tipo", lambda e: e["issueType"]),
+    ("status", "Status", lambda e: e["status"]),
+    ("pessoa", "Pessoa", lambda e: e["authorName"]),
+    ("tempo", "Tempo", lambda e: e["timeSpent"]),
+    ("horas", "Horas", lambda e: round(e["seconds"] / 3600, 2)),
+    ("comentario", "Comentário", lambda e: e["comment"]),
+]
+DEFAULT_EXPORT_FIELDS = ["data", "projeto", "task", "resumo", "pessoa", "tempo", "horas", "comentario"]
+
+
+def build_csv_bytes(title, info, cols, rows, total_row, header_block) -> bytes:
+    out = io.StringIO()
+    w = csv.writer(out, delimiter=";", lineterminator="\r\n")
+
+    def conv(v):
+        return str(v).replace(".", ",") if isinstance(v, float) else v
+
+    if header_block:
+        w.writerow([title])
+        for label, value in info:
+            w.writerow([label, value])
+        w.writerow([])
+    w.writerow(cols)
+    for row in rows:
+        w.writerow([conv(v) for v in row])
+    if total_row:
+        w.writerow([conv(v) for v in total_row])
+    return ("\ufeff" + out.getvalue()).encode("utf-8")  # BOM p/ Excel abrir como UTF-8
+
+
+def build_xlsx_bytes(title, info, cols, rows, total_row, header_block) -> bytes:
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+    from openpyxl.utils import get_column_letter
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Relatório"
+    r = 1
+    if header_block:
+        ws.cell(r, 1, title).font = Font(bold=True, size=13)
+        r += 2
+        for label, value in info:
+            ws.cell(r, 1, label).font = Font(bold=True)
+            ws.cell(r, 2, value)
+            r += 1
+        r += 1
+    header_row = r
+    for c, name in enumerate(cols, 1):
+        ws.cell(r, c, name).font = Font(bold=True)
+    r += 1
+    for row in rows:
+        for c, v in enumerate(row, 1):
+            cell = ws.cell(r, c, v)
+            if isinstance(v, float):
+                cell.number_format = "0.00"
+        r += 1
+    if total_row:
+        for c, v in enumerate(total_row, 1):
+            cell = ws.cell(r, c, v)
+            cell.font = Font(bold=True)
+            if isinstance(v, float):
+                cell.number_format = "0.00"
+    ws.freeze_panes = ws.cell(header_row + 1, 1)
+
+    # largura das colunas pelo conteudo (com teto)
+    for c in range(1, len(cols) + 1):
+        longest = len(str(cols[c - 1]))
+        for row in rows[:200]:
+            longest = max(longest, len(str(row[c - 1])))
+        ws.column_dimensions[get_column_letter(c)].width = min(max(longest + 2, 10), 60)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+@app.get("/api/export")
+def api_export(
+    start: str = Query(...),
+    end: str = Query(...),
+    users: str | None = None,
+    projects: str | None = None,
+    q: str | None = None,
+    fields: str | None = None,
+    fmt: str = "xlsx",
+    header: bool = True,
+    mode: str = "detalhado",
+    refresh: bool = False,
+    ctx=Depends(client_dep),
+):
+    """Exporta o relatorio do periodo em CSV ou Excel, com cabecalho de totais."""
+    client, fp, _ = ctx
+    start_d, end_d = parse_date(start, "start"), parse_date(end, "end")
+    try:
+        report = get_report(client, fp, start_d, end_d, csv_param(users), csv_param(projects), refresh)
+    except JiraError as e:
+        raise jira_http_error(e)
+
+    entries = report["entries"]
+    if q:
+        needle = q.strip().lower()
+        entries = [
+            e for e in entries
+            if needle in " ".join(
+                [e["issueKey"], e["summary"], e["authorName"], e["comment"], e["projectName"], e["date"]]
+            ).lower()
+        ]
+
+    total = sum(e["seconds"] for e in entries)
+    people = sorted({e["authorName"] for e in entries if e["authorName"]})
+    projs = sorted({e["projectName"] or e["projectKey"] for e in entries})
+    info = [
+        ("Período", f"{fmt_br(report['start'])} a {fmt_br(report['end'])}"),
+        ("Pessoas", ", ".join(people) if people else "—"),
+        ("Projetos", ", ".join(projs) if projs else "—"),
+        ("Apontamentos", str(len(entries))),
+        ("Total de horas", f"{fmt_hm(total)} ({str(round(total / 3600, 2)).replace('.', ',')})"),
+    ]
+
+    if mode == "tasks":
+        title = "Resumo por task — Jira"
+        cols = ["Task", "Resumo", "Projeto", "Status", "Pessoas", "Apontamentos", "Horas", "Estimado (h)"]
+        agg: dict[str, dict] = {}
+        for e in entries:
+            a = agg.setdefault(e["issueKey"], {
+                "resumo": e["summary"], "projeto": e["projectName"], "status": e["status"],
+                "pessoas": set(), "count": 0, "secs": 0, "estimado": e["estimateSeconds"],
+            })
+            a["count"] += 1
+            a["secs"] += e["seconds"]
+            a["pessoas"].add(e["authorName"])
+        rows = [
+            [key, a["resumo"], a["projeto"], a["status"], ", ".join(sorted(a["pessoas"])),
+             a["count"], round(a["secs"] / 3600, 2),
+             round(a["estimado"] / 3600, 2) if a["estimado"] else ""]
+            for key, a in sorted(agg.items(), key=lambda kv: -kv[1]["secs"])
+        ]
+        total_row = ["TOTAL", "", "", "", "", len(entries), round(total / 3600, 2), ""]
+        base_name = "tasks"
+    else:
+        title = "Relatório de apontamentos — Jira"
+        wanted = set(csv_param(fields) or DEFAULT_EXPORT_FIELDS)
+        selected = [f for f in EXPORT_FIELDS if f[0] in wanted] or \
+                   [f for f in EXPORT_FIELDS if f[0] in DEFAULT_EXPORT_FIELDS]
+        cols = [label for _, label, _ in selected]
+        keys = [key for key, _, _ in selected]
+        rows = [[getter(e) for _, _, getter in selected] for e in entries]
+        total_row = [""] * len(cols)
+        total_row[0] = "TOTAL"
+        if "tempo" in keys:
+            total_row[keys.index("tempo")] = fmt_hm(total)
+        if "horas" in keys:
+            total_row[keys.index("horas")] = round(total / 3600, 2)
+        base_name = "apontamentos"
+
+    filename = f"{base_name}_{report['start']}_a_{report['end']}"
+    if fmt == "xlsx":
+        content = build_xlsx_bytes(title, info, cols, rows, total_row, header)
+        media = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        filename += ".xlsx"
+    else:
+        content = build_csv_bytes(title, info, cols, rows, total_row, header)
+        media = "text/csv; charset=utf-8"
+        filename += ".csv"
+    return Response(
+        content=content,
+        media_type=media,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 # ---------- front-end ----------

@@ -193,6 +193,23 @@ td a:hover { text-decoration: underline; }
 .day-chip.partial .mark { color: var(--serious); }
 .day-chip.today { border-style: dashed; }
 
+/* ---- painel de exportação ---- */
+.export-panel {
+  left: auto; right: 0; min-width: 280px; padding: 12px;
+  display: none; flex-direction: column; gap: 10px;
+}
+.dropdown.open .export-panel { display: flex; }
+.ex-sec { display: flex; flex-direction: column; gap: 4px; }
+.ex-label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--muted); display: flex; align-items: center; justify-content: space-between;
+}
+.ex-opt { display: flex; align-items: center; gap: 7px; font-size: 13px; cursor: pointer; padding: 2px 0; }
+.ex-opt input { accent-color: var(--s1); }
+.ex-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
+.ex-fields.disabled { opacity: 0.45; pointer-events: none; }
+.ex-link { background: none; border: none; color: var(--s1); font-size: 11px; cursor: pointer; padding: 0; text-transform: none; letter-spacing: 0; }
+
 /* ---- login ---- */
 .login-overlay {
   position: fixed; inset: 0; z-index: 50; background: var(--page);

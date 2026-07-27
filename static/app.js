@@ -555,22 +555,100 @@ function renderWorklogsTable() {
     </tbody>`;
 }
 
-function exportCsv() {
-  const entries = filteredEntries();
-  const header = ["data", "projeto", "task", "resumo", "pessoa", "tempo", "horas_decimal", "comentario"];
-  const lines = [header.join(";")];
-  for (const e of entries) {
-    lines.push([
-      e.date, e.projectName, e.issueKey, e.summary, e.authorName,
-      e.timeSpent, (e.seconds / 3600).toFixed(2).replace(".", ","), e.comment,
-    ].map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(";"));
+/* ---------- exportação (CSV / Excel via backend) ---------- */
+
+const EXPORT_FIELD_DEFS = [
+  ["data", "Data"], ["hora", "Hora"], ["projeto", "Projeto"], ["task", "Task"],
+  ["resumo", "Resumo"], ["tipo", "Tipo"], ["status", "Status"], ["pessoa", "Pessoa"],
+  ["tempo", "Tempo"], ["horas", "Horas"], ["comentario", "Comentário"],
+];
+const EXPORT_DEFAULT_FIELDS = ["data", "projeto", "task", "resumo", "pessoa", "tempo", "horas", "comentario"];
+
+let exportPrefs = { mode: "detalhado", fmt: "xlsx", fields: [...EXPORT_DEFAULT_FIELDS], header: true };
+try {
+  const saved = JSON.parse(localStorage.getItem("jira-dash-export") || "null");
+  if (saved && Array.isArray(saved.fields)) exportPrefs = { ...exportPrefs, ...saved };
+} catch { /* ignora */ }
+
+function saveExportPrefs() {
+  try { localStorage.setItem("jira-dash-export", JSON.stringify(exportPrefs)); } catch { /* ignora */ }
+}
+
+function initExportPanel() {
+  const root = $("#dd-export");
+  const panel = root.querySelector(".export-panel");
+
+  $("#ex-fields").innerHTML = EXPORT_FIELD_DEFS.map(([key, label]) => `
+    <label class="ex-opt"><input type="checkbox" data-field="${key}" ${exportPrefs.fields.includes(key) ? "checked" : ""}> ${label}</label>`).join("");
+  panel.querySelector(`input[name="ex-mode"][value="${exportPrefs.mode}"]`).checked = true;
+  panel.querySelector(`input[name="ex-fmt"][value="${exportPrefs.fmt}"]`).checked = true;
+  $("#ex-header").checked = exportPrefs.header;
+
+  const syncFieldsDisabled = () =>
+    $("#ex-fields").classList.toggle("disabled", exportPrefs.mode === "tasks");
+  syncFieldsDisabled();
+
+  panel.addEventListener("change", () => {
+    exportPrefs.mode = panel.querySelector('input[name="ex-mode"]:checked').value;
+    exportPrefs.fmt = panel.querySelector('input[name="ex-fmt"]:checked').value;
+    exportPrefs.header = $("#ex-header").checked;
+    exportPrefs.fields = [...panel.querySelectorAll("[data-field]:checked")].map((i) => i.dataset.field);
+    syncFieldsDisabled();
+    saveExportPrefs();
+  });
+  $("#ex-default").addEventListener("click", () => {
+    panel.querySelectorAll("[data-field]").forEach((i) =>
+      (i.checked = EXPORT_DEFAULT_FIELDS.includes(i.dataset.field)));
+    exportPrefs.fields = [...EXPORT_DEFAULT_FIELDS];
+    saveExportPrefs();
+  });
+  $("#btn-export").addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    document.querySelectorAll(".dropdown.open").forEach((d) => d !== root && d.classList.remove("open"));
+    root.classList.toggle("open");
+  });
+  panel.addEventListener("click", (ev) => ev.stopPropagation());
+  $("#ex-go").addEventListener("click", doExport);
+}
+
+async function doExport() {
+  const btn = $("#ex-go");
+  btn.disabled = true;
+  btn.textContent = "Gerando…";
+  try {
+    const params = {
+      ...filterParams(false),
+      fmt: exportPrefs.fmt,
+      mode: exportPrefs.mode,
+      header: exportPrefs.header,
+    };
+    if (exportPrefs.mode === "detalhado" && exportPrefs.fields.length) {
+      params.fields = exportPrefs.fields.join(",");
+    }
+    if (state.wlSearch.trim()) params.q = state.wlSearch.trim();
+    const qs = new URLSearchParams(params).toString();
+    const res = await fetch(`/api/export?${qs}`, { headers: credHeaders() });
+    if (!res.ok) {
+      let detail = `${res.status}`;
+      try { detail = (await res.json()).detail || detail; } catch { /* binario */ }
+      throw new Error(detail);
+    }
+    const blob = await res.blob();
+    const base = exportPrefs.mode === "tasks" ? "tasks" : "apontamentos";
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${base}_${state.start}_a_${state.end}.${exportPrefs.fmt}`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    $("#dd-export").classList.remove("open");
+  } catch (err) {
+    const banner = $("#error-banner");
+    banner.textContent = "Erro ao exportar: " + err.message;
+    banner.hidden = false;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Exportar";
   }
-  const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `apontamentos_${state.start}_a_${state.end}.csv`;
-  a.click();
-  URL.revokeObjectURL(a.href);
 }
 
 /* ---------- render: sem apontamento ---------- */
@@ -697,7 +775,7 @@ async function boot() {
 
   $("#btn-apply").addEventListener("click", applyAndLoad);
   $("#btn-refresh").addEventListener("click", () => loadAll(true));
-  $("#btn-csv").addEventListener("click", exportCsv);
+  initExportPanel();
   $("#wl-search").addEventListener("input", (ev) => {
     state.wlSearch = ev.target.value;
     renderWorklogsTable();

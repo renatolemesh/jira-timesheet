@@ -99,7 +99,27 @@
         <h2>Apontamentos <span id="wl-count" class="muted"></span></h2>
         <div class="card-tools">
           <input type="search" id="wl-search" placeholder="Filtrar por task, texto, pessoa&hellip;">
-          <button class="btn ghost" id="btn-csv">&#8595; Exportar CSV</button>
+          <div class="dropdown" id="dd-export">
+            <button class="btn ghost" id="btn-export">&#8595; Exportar</button>
+            <div class="dd-panel export-panel">
+              <div class="ex-sec">
+                <span class="ex-label">Relat&oacute;rio</span>
+                <label class="ex-opt"><input type="radio" name="ex-mode" value="detalhado" checked> Apontamentos detalhados</label>
+                <label class="ex-opt"><input type="radio" name="ex-mode" value="tasks"> Resumo por task</label>
+              </div>
+              <div class="ex-sec">
+                <span class="ex-label">Formato</span>
+                <label class="ex-opt"><input type="radio" name="ex-fmt" value="xlsx" checked> Excel (.xlsx)</label>
+                <label class="ex-opt"><input type="radio" name="ex-fmt" value="csv"> CSV (separado por ;)</label>
+              </div>
+              <div class="ex-sec" id="ex-fields-sec">
+                <span class="ex-label">Campos <button type="button" id="ex-default" class="ex-link">restaurar padr&atilde;o</button></span>
+                <div id="ex-fields" class="ex-fields"></div>
+              </div>
+              <label class="ex-opt"><input type="checkbox" id="ex-header" checked> Cabe&ccedil;alho com totais (fatura)</label>
+              <button class="btn primary" id="ex-go">Exportar</button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="table-wrap"><table id="table-worklogs"></table></div>
