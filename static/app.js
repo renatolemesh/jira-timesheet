@@ -564,7 +564,7 @@ const EXPORT_FIELD_DEFS = [
 ];
 const EXPORT_DEFAULT_FIELDS = ["data", "projeto", "task", "resumo", "pessoa", "tempo", "horas", "comentario"];
 
-let exportPrefs = { mode: "detalhado", fmt: "xlsx", fields: [...EXPORT_DEFAULT_FIELDS], header: true };
+let exportPrefs = { mode: "detalhado", fmt: "xlsx", fields: [...EXPORT_DEFAULT_FIELDS], header: true, rate: 0 };
 try {
   const saved = JSON.parse(localStorage.getItem("jira-dash-export") || "null");
   if (saved && Array.isArray(saved.fields)) exportPrefs = { ...exportPrefs, ...saved };
@@ -583,6 +583,7 @@ function initExportPanel() {
   panel.querySelector(`input[name="ex-mode"][value="${exportPrefs.mode}"]`).checked = true;
   panel.querySelector(`input[name="ex-fmt"][value="${exportPrefs.fmt}"]`).checked = true;
   $("#ex-header").checked = exportPrefs.header;
+  if (exportPrefs.rate > 0) $("#ex-rate").value = exportPrefs.rate;
 
   const syncFieldsDisabled = () =>
     $("#ex-fields").classList.toggle("disabled", exportPrefs.mode === "tasks");
@@ -592,6 +593,7 @@ function initExportPanel() {
     exportPrefs.mode = panel.querySelector('input[name="ex-mode"]:checked').value;
     exportPrefs.fmt = panel.querySelector('input[name="ex-fmt"]:checked').value;
     exportPrefs.header = $("#ex-header").checked;
+    exportPrefs.rate = Math.max(0, parseFloat($("#ex-rate").value) || 0);
     exportPrefs.fields = [...panel.querySelectorAll("[data-field]:checked")].map((i) => i.dataset.field);
     syncFieldsDisabled();
     saveExportPrefs();
@@ -626,6 +628,9 @@ async function doExport() {
       params.fields = exportPrefs.fields.join(",");
     }
     if (state.wlSearch.trim()) params.q = state.wlSearch.trim();
+    exportPrefs.rate = Math.max(0, parseFloat($("#ex-rate").value) || 0);
+    saveExportPrefs();
+    if (exportPrefs.rate > 0) params.rate = exportPrefs.rate;
     const qs = new URLSearchParams(params).toString();
     const res = await fetch(`/api/export?${qs}`, { headers: credHeaders() });
     if (!res.ok) {

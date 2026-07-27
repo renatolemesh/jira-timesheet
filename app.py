@@ -472,6 +472,11 @@ def fmt_hm(seconds: int) -> str:
     return f"{h}h{m:02d}" if m else f"{h}h"
 
 
+def fmt_brl(value: float) -> str:
+    s = f"{value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    return f"R$ {s}"
+
+
 # (chave, rotulo, extrator) — a ordem aqui define a ordem das colunas
 EXPORT_FIELDS = [
     ("data", "Data", lambda e: fmt_br(e["date"])),
@@ -494,7 +499,7 @@ def build_csv_bytes(title, info, cols, rows, total_row, header_block) -> bytes:
     w = csv.writer(out, delimiter=";", lineterminator="\r\n")
 
     def conv(v):
-        return str(v).replace(".", ",") if isinstance(v, float) else v
+        return f"{v:.2f}".replace(".", ",") if isinstance(v, float) else v
 
     if header_block:
         w.writerow([title])
@@ -509,7 +514,7 @@ def build_csv_bytes(title, info, cols, rows, total_row, header_block) -> bytes:
     return ("\ufeff" + out.getvalue()).encode("utf-8")  # BOM p/ Excel abrir como UTF-8
 
 
-def build_xlsx_bytes(title, info, cols, rows, total_row, header_block) -> bytes:
+def build_xlsx_bytes(title, info, cols, rows, total_row, header_block, money_cols=()) -> bytes:
     from openpyxl import Workbook
     from openpyxl.styles import Font
     from openpyxl.utils import get_column_letter
@@ -530,18 +535,19 @@ def build_xlsx_bytes(title, info, cols, rows, total_row, header_block) -> bytes:
     for c, name in enumerate(cols, 1):
         ws.cell(r, c, name).font = Font(bold=True)
     r += 1
+    money_fmt = '"R$" #,##0.00'
     for row in rows:
         for c, v in enumerate(row, 1):
             cell = ws.cell(r, c, v)
             if isinstance(v, float):
-                cell.number_format = "0.00"
+                cell.number_format = money_fmt if c in money_cols else "0.00"
         r += 1
     if total_row:
         for c, v in enumerate(total_row, 1):
             cell = ws.cell(r, c, v)
             cell.font = Font(bold=True)
             if isinstance(v, float):
-                cell.number_format = "0.00"
+                cell.number_format = money_fmt if c in money_cols else "0.00"
     ws.freeze_panes = ws.cell(header_row + 1, 1)
 
     # largura das colunas pelo conteudo (com teto)
@@ -567,10 +573,15 @@ def api_export(
     fmt: str = "xlsx",
     header: bool = True,
     mode: str = "detalhado",
+    rate: float | None = Query(None, ge=0),
     refresh: bool = False,
     ctx=Depends(client_dep),
 ):
-    """Exporta o relatorio do periodo em CSV ou Excel, com cabecalho de totais."""
+    """Exporta o relatorio do periodo em CSV ou Excel, com cabecalho de totais.
+
+    Se 'rate' (valor/hora) for informado, adiciona a coluna Valor (R$) e os
+    totais em reais no cabecalho — pronto para emissao de fatura.
+    """
     client, fp, _ = ctx
     start_d, end_d = parse_date(start, "start"), parse_date(end, "end")
     try:
@@ -591,6 +602,11 @@ def api_export(
     total = sum(e["seconds"] for e in entries)
     people = sorted({e["authorName"] for e in entries if e["authorName"]})
     projs = sorted({e["projectName"] or e["projectKey"] for e in entries})
+    rate = rate or 0
+
+    def row_value(seconds: int) -> float:
+        return round(seconds / 3600 * rate, 2)
+
     info = [
         ("Período", f"{fmt_br(report['start'])} a {fmt_br(report['end'])}"),
         ("Pessoas", ", ".join(people) if people else "—"),
@@ -618,6 +634,12 @@ def api_export(
             for key, a in sorted(agg.items(), key=lambda kv: -kv[1]["secs"])
         ]
         total_row = ["TOTAL", "", "", "", "", len(entries), round(total / 3600, 2), ""]
+        if rate:
+            cols.append("Valor (R$)")
+            ordered = sorted(agg.items(), key=lambda kv: -kv[1]["secs"])
+            for row, (_, a) in zip(rows, ordered):
+                row.append(row_value(a["secs"]))
+            total_row.append(round(sum(r[-1] for r in rows), 2))
         base_name = "tasks"
     else:
         title = "Relatório de apontamentos — Jira"
@@ -627,17 +649,30 @@ def api_export(
         cols = [label for _, label, _ in selected]
         keys = [key for key, _, _ in selected]
         rows = [[getter(e) for _, _, getter in selected] for e in entries]
+        if rate:
+            cols.append("Valor (R$)")
+            for row, e in zip(rows, entries):
+                row.append(row_value(e["seconds"]))
         total_row = [""] * len(cols)
         total_row[0] = "TOTAL"
         if "tempo" in keys:
             total_row[keys.index("tempo")] = fmt_hm(total)
         if "horas" in keys:
             total_row[keys.index("horas")] = round(total / 3600, 2)
+        if rate:
+            total_row[-1] = round(sum(r[-1] for r in rows), 2)
         base_name = "apontamentos"
+
+    money_cols = ()
+    if rate:
+        total_value = total_row[-1] if rows else 0.0
+        info.append(("Valor hora", fmt_brl(rate)))
+        info.append(("Valor total", fmt_brl(total_value)))
+        money_cols = (len(cols),)
 
     filename = f"{base_name}_{report['start']}_a_{report['end']}"
     if fmt == "xlsx":
-        content = build_xlsx_bytes(title, info, cols, rows, total_row, header)
+        content = build_xlsx_bytes(title, info, cols, rows, total_row, header, money_cols)
         media = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         filename += ".xlsx"
     else:

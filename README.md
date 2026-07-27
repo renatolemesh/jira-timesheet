@@ -56,8 +56,10 @@ no `.env` para pular o login (uso pessoal). O `.env` está no `.gitignore` —
 - **Apontamentos** — todos os worklogs do período com busca livre e exportação
   em **Excel (.xlsx) ou CSV** (separador `;`, compatível com Excel pt-BR), com
   cabeçalho de totais (período, pessoas, projetos, total de horas — pronto para
-  anexar em fatura), escolha de quais campos exportar (ou o conjunto padrão) e
-  dois relatórios: apontamentos detalhados ou resumo por task.
+  anexar em fatura), escolha de quais campos exportar (ou o conjunto padrão),
+  dois relatórios (apontamentos detalhados ou resumo por task) e **valor/hora
+  opcional** — informe o valor em R$ e o relatório sai com a coluna Valor (R$)
+  calculada e o valor total no cabeçalho.
 - **Sem apontamento** — por pessoa, os dias úteis com menos horas que a meta
   (padrão 8h/dia, configurável no filtro), e as tasks atualizadas no período
   cujo responsável não registrou tempo nelas.
