@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Apontamentos de Horas — relatórios de worklogs do Jira Cloud</title>
+<meta name="description" content="Veja as horas registradas no Jira Cloud por pessoa, projeto e dia, encontre apontamentos esquecidos e exporte a planilha do mês. Login oficial da Atlassian, acesso somente leitura.">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/landing.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9201;</text></svg>">
+</head>
+<body class="landing">
+
+<header class="lp-top">
+  <div class="lp-wrap lp-top-inner">
+    <a class="lp-brand" href="/"><svg class="lp-logo" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M10 2h4M12 2v3"/></svg><span>Apontamentos <span class="accent">de Horas</span></span></a>
+    <nav class="lp-nav">
+      <a href="#recursos">Recursos</a>
+      <a href="#como-funciona">Como funciona</a>
+      <a href="#seguranca">Seguran&ccedil;a</a>
+      <a class="btn primary" href="/auth/login">Entrar</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="lp-hero">
+    <div class="lp-wrap">
+      <p class="lp-eyebrow">Para equipes que registram horas no Jira Cloud</p>
+      <h1>As horas do m&ecirc;s, conferidas antes do fechamento.</h1>
+      <p class="lp-lead">Veja quem apontou o qu&ecirc;, em qual projeto e em que dia. Encontre os dias esquecidos
+        antes que virem problema e exporte a planilha pronta para faturar.</p>
+      <div class="lp-cta">
+        <a class="btn primary lp-btn-lg" href="/auth/login">Entrar com Atlassian</a>
+        <a class="btn ghost lp-btn-lg" href="#como-funciona">Como funciona</a>
+      </div>
+      <p class="lp-note">Login pela p&aacute;gina oficial da Atlassian &middot; acesso somente leitura &middot; gratuito</p>
+
+      <figure class="lp-shot lp-shot-hero">
+        <picture>
+          <source srcset="/static/img/dashboard-dark.webp" media="(prefers-color-scheme: dark)">
+          <img src="/static/img/dashboard-light.webp" width="1920" height="1143"
+               alt="Painel com total de horas do m&ecirc;s, gr&aacute;fico de horas por dia empilhado por pessoa e barras de horas por pessoa e por projeto">
+        </picture>
+      </figure>
+      <p class="lp-caption">Capturas com dados fict&iacute;cios.</p>
+    </div>
+  </section>
+
+  <section id="recursos" class="lp-section">
+    <div class="lp-wrap">
+      <h2>O que voc&ecirc; enxerga</h2>
+      <div class="lp-features">
+        <article>
+          <h3>Horas por pessoa, projeto e dia</h3>
+          <p>Totais do per&iacute;odo, m&eacute;dia por dia &uacute;til e o gr&aacute;fico di&aacute;rio de
+            toda a equipe. Filtre por pessoas e projetos, ou use os atalhos: hoje, semana, m&ecirc;s,
+            m&ecirc;s passado.</p>
+        </article>
+        <article>
+          <h3>Quem esqueceu de apontar</h3>
+          <p>Cada dia &uacute;til abaixo da meta aparece destacado, por pessoa. E as tasks que andaram no
+            per&iacute;odo sem nenhum registro do respons&aacute;vel entram numa lista pr&oacute;pria.</p>
+        </article>
+        <article>
+          <h3>Planilha pronta para faturar</h3>
+          <p>Exporte em Excel ou CSV, detalhado ou resumido por task, com cabe&ccedil;alho de totais, os
+            campos que voc&ecirc; escolher e, se quiser, valor por hora j&aacute; calculado.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="lp-section lp-split">
+    <div class="lp-wrap lp-split-inner">
+      <div class="lp-split-text">
+        <h2>Sem apontamento, sem surpresa</h2>
+        <p>Defina quantas horas por dia a equipe deve registrar. O relat&oacute;rio mostra, pessoa por
+          pessoa, os dias que ficaram abaixo, com o que foi apontado em cada um, e quem est&aacute;
+          em dia aparece com um visto verde.</p>
+        <p>Fins de semana e dias que ainda n&atilde;o chegaram ficam de fora, e o dia de hoje
+          aparece tracejado, porque ainda est&aacute; em andamento.</p>
+      </div>
+      <figure class="lp-shot">
+        <picture>
+          <source srcset="/static/img/pendencias-dark.webp" media="(prefers-color-scheme: dark)">
+          <img src="/static/img/pendencias-light.webp" width="1920" height="1143" loading="lazy"
+               alt="Lista por pessoa dos dias &uacute;teis abaixo da meta de 8 horas, com quem est&aacute; em dia marcado em verde">
+        </picture>
+      </figure>
+    </div>
+  </section>
+
+  <section class="lp-section lp-split lp-split-rev">
+    <div class="lp-wrap lp-split-inner">
+      <div class="lp-split-text">
+        <h2>Cada apontamento, com contexto</h2>
+        <p>A lista completa do per&iacute;odo traz data, task, pessoa, tempo e o coment&aacute;rio do
+          registro. Busque por qualquer texto e abra a task no Jira com um clique.</p>
+        <p>&Eacute; dessa lista que sai a exporta&ccedil;&atilde;o: o que voc&ecirc; filtrou &eacute;
+          o que vai para a planilha.</p>
+      </div>
+      <figure class="lp-shot">
+        <picture>
+          <source srcset="/static/img/apontamentos-dark.webp" media="(prefers-color-scheme: dark)">
+          <img src="/static/img/apontamentos-light.webp" width="1920" height="1143" loading="lazy"
+               alt="Tabela de apontamentos com data, task, pessoa, tempo e coment&aacute;rio">
+        </picture>
+      </figure>
+    </div>
+  </section>
+
+  <section id="como-funciona" class="lp-section">
+    <div class="lp-wrap">
+      <h2>Como funciona</h2>
+      <ol class="lp-steps">
+        <li>
+          <h3>Entre com a sua conta Atlassian</h3>
+          <p>O bot&atilde;o leva &agrave; p&aacute;gina oficial de login da Atlassian. N&atilde;o existe
+            cadastro nem senha neste site.</p>
+        </li>
+        <li>
+          <h3>Autorize o acesso de leitura</h3>
+          <p>A Atlassian mostra exatamente o que o app pode fazer: ler tasks, apontamentos e usu&aacute;rios.
+            Nada de criar, alterar ou apagar.</p>
+        </li>
+        <li>
+          <h3>Escolha o per&iacute;odo</h3>
+          <p>Os relat&oacute;rios s&atilde;o montados na hora, com os dados que a sua conta j&aacute;
+            pode ver no Jira.</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <section id="seguranca" class="lp-section lp-security">
+    <div class="lp-wrap">
+      <h2>Seus dados continuam seus</h2>
+      <ul class="lp-checks">
+        <li><b>Login oficial da Atlassian.</b> Este site nunca v&ecirc; nem recebe a sua senha.</li>
+        <li><b>Somente leitura.</b> O app n&atilde;o tem permiss&atilde;o para mudar nada no seu Jira.</li>
+        <li><b>Nada gravado em disco.</b> Os resultados ficam em mem&oacute;ria por at&eacute; 1 hora, s&oacute;
+          para acelerar as consultas.</li>
+        <li><b>Revogue quando quiser</b> em id.atlassian.com &rarr; Aplicativos conectados.</li>
+      </ul>
+      <p class="lp-more">Detalhes na <a href="/privacy">Pol&iacute;tica de Privacidade</a>.</p>
+    </div>
+  </section>
+
+  <section class="lp-final">
+    <div class="lp-wrap">
+      <h2>Pronto para fechar o m&ecirc;s?</h2>
+      <a class="btn primary lp-btn-lg" href="/auth/login">Entrar com Atlassian</a>
+    </div>
+  </section>
+</main>
+
+<footer class="lp-footer">
+  <div class="lp-wrap lp-footer-inner">
+    <p>Apontamentos de Horas &eacute; uma ferramenta independente, sem v&iacute;nculo com a Atlassian.
+      Jira e Atlassian s&atilde;o marcas da Atlassian Pty Ltd.</p>
+    <nav class="legal-nav">
+      <a href="/privacy">Privacidade</a>
+      <a href="/terms">Termos</a>
+      <a href="/contact">Contato</a>
+    </nav>
+  </div>
+</footer>
+
+</body>
+</html>
