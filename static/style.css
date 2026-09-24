@@ -227,6 +227,8 @@ td a:hover { text-decoration: underline; }
 .login-card .field input { width: 100%; }
 .login-card a { color: var(--s1); }
 .login-card .btn { margin-top: 4px; }
+.login-card a.btn { color: #fff; text-align: center; text-decoration: none; padding-block: 10px; }
+.login-card .login-links { font-size: 11.5px; text-align: center; }
 
 /* ---- tooltip ---- */
 .tooltip {

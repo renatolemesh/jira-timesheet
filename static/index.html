@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Apontamentos Jira</title>
+<title>Apontamentos de Horas</title>
 <link rel="stylesheet" href="/static/style.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9201;</text></svg>">
 </head>
@@ -11,12 +11,12 @@
 
 <header class="topbar">
   <div class="topbar-inner">
-    <h1>Apontamentos <span class="accent">Jira</span></h1>
+    <h1>Apontamentos <span class="accent">de Horas</span></h1>
     <div class="topbar-right">
       <span id="last-update" class="muted"></span>
       <button id="btn-refresh" class="btn ghost" title="Buscar dados novos no Jira (ignora cache)">&#8635; Atualizar</button>
       <span id="who" class="muted"></span>
-      <button id="btn-logout" class="btn ghost" hidden title="Esquecer as credenciais salvas neste navegador">Sair</button>
+      <button id="btn-logout" class="btn ghost" hidden title="Encerrar a sess&atilde;o neste navegador">Sair</button>
     </div>
   </div>
 </header>
@@ -154,22 +154,15 @@
 </main>
 
 <div id="login-overlay" class="login-overlay" hidden>
-  <form class="login-card" id="login-form">
-    <h1>Apontamentos <span class="accent">Jira</span></h1>
-    <p class="muted">Conecte com sua conta do Jira Cloud. As credenciais ficam salvas <b>somente neste navegador</b> (localStorage) e s&atilde;o enviadas apenas ao servidor local.</p>
-    <label class="field"><span>URL do Jira</span>
-      <input id="l-url" placeholder="https://sua-empresa.atlassian.net" required>
-    </label>
-    <label class="field"><span>E-mail</span>
-      <input id="l-email" type="email" placeholder="voce@empresa.com.br" required>
-    </label>
-    <label class="field"><span>API token</span>
-      <input id="l-token" type="password" required>
-    </label>
-    <p class="muted">Gere um token em <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank" rel="noopener">id.atlassian.com &rarr; Security &rarr; API tokens</a>.</p>
+  <div class="login-card">
+    <h1>Apontamentos de Horas</h1>
+    <p class="muted">Relat&oacute;rios dos registros de horas (worklogs) do seu Jira Cloud: horas por pessoa, por projeto e por dia, e exporta&ccedil;&atilde;o em CSV/Excel.</p>
+    <p class="muted">O login &eacute; feito na p&aacute;gina oficial da Atlassian. Este site <b>nunca recebe a sua senha</b>, e o acesso autorizado &eacute; <b>somente leitura</b>. Voc&ecirc; pode revogar quando quiser em id.atlassian.com.</p>
     <div id="login-error" class="error-banner" hidden></div>
-    <button class="btn primary" type="submit" id="login-btn">Entrar</button>
-  </form>
+    <a class="btn primary" href="/auth/login" id="login-btn">Entrar com Atlassian</a>
+    <p class="muted login-links">Ferramenta independente, sem v&iacute;nculo com a Atlassian. &middot;
+      <a href="/privacy">Privacidade</a> &middot; <a href="/terms">Termos</a> &middot; <a href="/contact">Contato</a></p>
+  </div>
 </div>
 
 <div id="tooltip" class="tooltip" hidden></div>

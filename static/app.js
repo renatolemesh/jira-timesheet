@@ -112,22 +112,14 @@ function hideTooltip() { tooltip.hidden = true; }
 
 /* ---------- API ---------- */
 
-/* credenciais do Jira salvas neste navegador (tela de login) */
-let creds = null;
-try { creds = JSON.parse(localStorage.getItem("jira-dash-creds") || "null"); } catch { /* ignora */ }
-
-function credHeaders() {
-  if (!creds) return {};
-  return {
-    "X-Jira-Base-Url": creds.baseUrl,
-    "X-Jira-Email": creds.email,
-    "X-Jira-Token": creds.token,
-  };
-}
+/* A autenticacao e o cookie de sessao do login com a Atlassian (OAuth), enviado
+   sozinho pelo navegador. A versao antiga guardava URL + e-mail + API token do
+   Jira aqui no localStorage: apaga o que tiver sobrado. */
+try { localStorage.removeItem("jira-dash-creds"); } catch { /* ignora */ }
 
 async function apiGet(path, params) {
   const qs = new URLSearchParams(params).toString();
-  const res = await fetch(`${path}?${qs}`, { headers: credHeaders() });
+  const res = await fetch(`${path}?${qs}`);
   if (!res.ok) {
     let detail = `${res.status}`;
     try { detail = (await res.json()).detail || detail; } catch { /* html */ }
@@ -632,7 +624,7 @@ async function doExport() {
     saveExportPrefs();
     if (exportPrefs.rate > 0) params.rate = exportPrefs.rate;
     const qs = new URLSearchParams(params).toString();
-    const res = await fetch(`/api/export?${qs}`, { headers: credHeaders() });
+    const res = await fetch(`/api/export?${qs}`);
     if (!res.ok) {
       let detail = `${res.status}`;
       try { detail = (await res.json()).detail || detail; } catch { /* binario */ }
@@ -797,8 +789,15 @@ async function boot() {
   window.addEventListener("resize", () => { if (state.report) renderDayChart(aggregate(state.report.entries)); });
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", renderAll);
 
-  $("#login-form").addEventListener("submit", doLogin);
   $("#btn-logout").addEventListener("click", logout);
+
+  // o callback do OAuth devolve erros em ?login_error=...; mostra e limpa a URL
+  const loginError = new URLSearchParams(location.search).get("login_error");
+  if (loginError) {
+    history.replaceState(null, "", location.pathname);
+    showLogin(loginError);
+    return;
+  }
 
   await startApp();
 }
@@ -808,17 +807,27 @@ async function startApp() {
   $("#error-banner").hidden = true;
   try {
     state.meta = await apiGet("/api/meta", {});
+
+    /* Abre filtrado em quem entrou. Sem isso a primeira tela busca os worklogs
+       de TODA a equipe no mes - a consulta mais cara que existe aqui - e o
+       usuario fica olhando "Carregando" antes de ver qualquer coisa. Quem quer
+       a equipe inteira tira a marcacao no filtro "Pessoas". */
+    const eu = state.meta.myself?.accountId;
+    if (!state.users.size && eu && state.meta.users.some((u) => u.accountId === eu)) {
+      state.users.add(eu);
+    }
+
     buildDropdown("#dd-users",
       state.meta.users.map((u) => ({ value: u.accountId, label: u.displayName })),
       state.users, "Todas", true);
     buildDropdown("#dd-projects",
       state.meta.projects.map((p) => ({ value: p.key, label: `${p.name} (${p.key})` })),
       state.projects, "Todos", false);
-    $("#who").textContent = creds?.displayName || state.meta.myself?.displayName || "";
-    $("#btn-logout").hidden = !creds;
+    $("#who").textContent = state.meta.myself?.displayName || "";
+    $("#btn-logout").hidden = false;
   } catch (err) {
     if (err.status === 401) {
-      showLogin(creds ? "As credenciais salvas não funcionaram — entre novamente." : "");
+      showLogin();
       return;
     }
     const banner = $("#error-banner");
@@ -835,56 +844,14 @@ async function startApp() {
 function showLogin(msg) {
   $("#loading").hidden = true;
   $("#login-overlay").hidden = false;
-  if (creds) {
-    $("#l-url").value = creds.baseUrl || "";
-    $("#l-email").value = creds.email || "";
-  }
   const errEl = $("#login-error");
   errEl.hidden = !msg;
   if (msg) errEl.textContent = msg;
 }
 
-async function doLogin(ev) {
-  ev.preventDefault();
-  const body = {
-    baseUrl: $("#l-url").value.trim().replace(/\/+$/, ""),
-    email: $("#l-email").value.trim(),
-    token: $("#l-token").value.trim(),
-  };
-  const btn = $("#login-btn");
-  btn.disabled = true;
-  btn.textContent = "Conectando…";
-  try {
-    const res = await fetch("/api/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.detail || `Erro ${res.status}`);
-    creds = { ...body, displayName: data.displayName };
-    localStorage.setItem("jira-dash-creds", JSON.stringify(creds));
-    $("#l-token").value = "";
-    $("#login-overlay").hidden = true;
-    await startApp();
-  } catch (err) {
-    const errEl = $("#login-error");
-    errEl.textContent = String(err.message || err);
-    errEl.hidden = false;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "Entrar";
-  }
-}
-
-function logout() {
-  localStorage.removeItem("jira-dash-creds");
-  creds = null;
-  state.report = null;
-  state.missing = null;
-  $("#btn-logout").hidden = true;
-  $("#who").textContent = "";
-  showLogin();
+async function logout() {
+  try { await fetch("/auth/logout", { method: "POST" }); } catch { /* sessao some de qualquer jeito */ }
+  location.href = "/";
 }
 
 function applyAndLoad() {

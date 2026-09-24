@@ -18,11 +18,19 @@ class JiraError(Exception):
 
 
 class JiraClient:
-    def __init__(self, base_url: str, email: str, token: str):
+    def __init__(self, base_url: str, email: str = "", token: str = "", bearer: str = ""):
+        """`bearer`: token OAuth (base_url = api.atlassian.com/ex/jira/{cloudId}).
+        `email` + `token`: API token classico, so para uso local via .env."""
         self.base_url = base_url.rstrip("/")
         self.session = requests.Session()
-        self.session.auth = (email, token)
         self.session.headers.update({"Accept": "application/json"})
+        if bearer:
+            self.set_bearer(bearer)
+        else:
+            self.session.auth = (email, token)
+
+    def set_bearer(self, access_token: str):
+        self.session.headers["Authorization"] = f"Bearer {access_token}"
 
     # ---------- HTTP ----------
 

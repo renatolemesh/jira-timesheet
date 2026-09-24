@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Política de Privacidade — Apontamentos de Horas</title>
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/legal.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9201;</text></svg>">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <h1><a href="/" style="color:inherit;text-decoration:none">Apontamentos de Horas</a></h1>
+    <nav class="legal-nav">
+      <a href="/privacy" aria-current="page">Privacidade</a>
+      <a href="/terms">Termos</a>
+      <a href="/contact">Contato</a>
+    </nav>
+  </div>
+</header>
+
+<main class="legal">
+  <h1>Política de Privacidade</h1>
+  <p class="updated">Última atualização: 22 de setembro de 2026</p>
+
+  <p>O Apontamentos de Horas é uma ferramenta independente, mantida por Renato Lemes, que
+  gera relatórios dos registros de horas (worklogs) do Jira Cloud. Não é um produto da
+  Atlassian, nem é afiliado, endossado ou patrocinado por ela. Jira e Atlassian são marcas
+  da Atlassian Pty Ltd.</p>
+
+  <h2>Como o acesso ao Jira funciona</h2>
+  <p>O login é feito na própria Atlassian. Ao clicar em "Entrar com Atlassian", você é levado
+  à página oficial da Atlassian, onde decide se autoriza o acesso. <strong>Este site nunca vê
+  nem recebe a sua senha da Atlassian.</strong> O acesso autorizado é somente de leitura:
+  o app não cria, altera nem apaga nada no seu Jira.</p>
+
+  <h2>Quais dados são tratados</h2>
+  <ul>
+    <li><strong>Dados da sua conta Atlassian:</strong> identificador da conta, nome de
+    exibição e e-mail, usados para mostrar quem está conectado.</li>
+    <li><strong>Dados do Jira que você já pode ver:</strong> projetos, tarefas, usuários e
+    registros de horas, usados para montar os relatórios.</li>
+    <li><strong>Token de acesso:</strong> a autorização emitida pela Atlassian quando você
+    faz login, usada para consultar a API do Jira em seu nome.</li>
+    <li><strong>Registros técnicos do servidor:</strong> endereço IP, data e caminho de cada
+    requisição, mantidos pelo servidor web para segurança e diagnóstico.</li>
+  </ul>
+
+  <h2>Onde os dados ficam e por quanto tempo</h2>
+  <ul>
+    <li>O servidor <strong>não grava</strong> dados do Jira nem tokens em banco de dados ou
+    em disco. Os resultados das consultas ficam em memória por até 1 hora, só para acelerar
+    os relatórios, e somem quando o serviço é reiniciado.</li>
+    <li>O token de acesso vale apenas durante a sessão e é descartado quando você clica em
+    "Sair".</li>
+    <li>Preferências de uso, como cores do gráfico e colunas da exportação, ficam no
+    armazenamento local do seu próprio navegador.</li>
+    <li>Arquivos exportados (CSV/Excel) são gerados na hora e baixados direto para o seu
+    computador; nenhuma cópia fica no servidor.</li>
+  </ul>
+
+  <h2>Compartilhamento</h2>
+  <p>Os seus dados não são vendidos, compartilhados com terceiros nem usados para
+  publicidade. A única comunicação externa é com a API da Atlassian, para buscar os dados
+  que você pediu.</p>
+
+  <h2>Como revogar o acesso</h2>
+  <p>Você pode revogar a autorização a qualquer momento em
+  <a href="https://id.atlassian.com/manage-profile/apps" rel="noopener">id.atlassian.com
+  → Aplicativos conectados</a>. Depois disso, o app perde o acesso ao seu Jira na hora.</p>
+
+  <h2>Seus direitos</h2>
+  <p>Nos termos da Lei Geral de Proteção de Dados (Lei nº 13.709/2018), você pode pedir
+  informações sobre o tratamento dos seus dados, correção ou exclusão. Use a página de
+  <a href="/contact">contato</a>.</p>
+
+  <h2>Alterações</h2>
+  <p>Mudanças nesta política serão publicadas nesta página, com a data de atualização
+  acima.</p>
+</main>
+
+</body>
+</html>

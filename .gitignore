@@ -1,4 +1,5 @@
 .env
+.env.oauth
 __pycache__/
 *.pyc
 .venv/

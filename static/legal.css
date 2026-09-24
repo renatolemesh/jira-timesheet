@@ -1,0 +1,20 @@
+/* Paginas institucionais (privacidade, termos, contato). Usa os tokens de style.css. */
+.legal { max-width: 720px; margin: 0 auto; padding: 32px 20px 48px; }
+.legal h1 { font-size: 24px; margin-bottom: 4px; }
+.legal h2 { font-size: 16px; margin: 28px 0 8px; }
+.legal p, .legal li { font-size: 15px; line-height: 1.6; color: var(--ink-2); }
+.legal ul { padding-left: 20px; }
+.legal a { color: var(--s1); }
+.legal .updated { color: var(--muted); font-size: 13px; margin: 0 0 24px; }
+.legal-nav { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; }
+.legal-nav a { color: var(--ink-2); text-decoration: none; }
+.legal-nav a:hover, .legal-nav a[aria-current="page"] { color: var(--s1); }
+.legal .contact-card {
+  border: 1px solid var(--border); border-radius: 8px; background: var(--surface-1);
+  padding: 20px; margin-top: 16px;
+}
+.legal .contact-card a { font-size: 17px; font-weight: 600; word-break: break-all; }
+.legal-footer {
+  max-width: 1180px; margin: 32px auto 0; padding: 16px 20px 24px;
+  border-top: 1px solid var(--border);
+}

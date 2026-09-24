@@ -1,35 +1,46 @@
 """Backend do dashboard de apontamentos do Jira.
 
 Sobe um servidor FastAPI que expoe a API de relatorios e serve o front-end
-estatico. As credenciais do Jira chegam do navegador em headers
-(X-Jira-Base-Url / X-Jira-Email / X-Jira-Token), salvas la via tela de login;
-um .env ao lado deste script funciona como fallback opcional.
+estatico. O login e feito na Atlassian (OAuth 2.0 3LO, ver oauth.py): o
+navegador so guarda um cookie de sessao, e o token fica em memoria aqui.
+Credenciais do .env (API token) continuam como fallback para uso local.
 
 Rodar:  python app.py   (ou: uvicorn app:app --reload)
 """
 
 import csv
 import hashlib
+import html
 import io
+import mimetypes
+import secrets
 import os
 import threading
 import time
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from urllib.parse import urlencode
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query
-from fastapi.responses import FileResponse, Response
+from fastapi import Cookie, Depends, FastAPI, HTTPException, Query, Request
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
 
+import oauth
 from jira_client import JiraClient, JiraError
 
 BASE_DIR = Path(__file__).parent
 
+# a imagem python:slim nao tem /etc/mime.types: sem isto as capturas .webp da
+# landing saem como application/octet-stream
+mimetypes.add_type("image/webp", ".webp")
+
 
 def load_env():
-    env_path = BASE_DIR / ".env"
-    if env_path.exists():
+    # .env.oauth: client id/secret do app na Atlassian (no container chega via env_file)
+    for name in (".env", ".env.oauth"):
+        env_path = BASE_DIR / name
+        if not env_path.exists():
+            continue
         for line in env_path.read_text(encoding="utf-8").splitlines():
             line = line.strip()
             if not line or line.startswith("#") or "=" not in line:
@@ -46,36 +57,59 @@ ENV_EMAIL = os.environ.get("JIRA_EMAIL", "")
 ENV_TOKEN = os.environ.get("JIRA_TOKEN", "")
 PORT = int(os.environ.get("PORT", "8000"))
 
-app = FastAPI(title="Apontamentos Jira")
+app = FastAPI(title="Apontamentos de Horas")
+
+# O callback OAuth esta cadastrado so no dominio rlhtech; o cookie de sessao
+# criado la nao vale em outro host. O dominio antigo (o denunciado como
+# phishing) so redireciona.
+DOMINIOS_ANTIGOS = {"jira-timesheet.pharmaprices.shop"}
+DOMINIO_CANONICO = "jira-timesheet.rlhtech.com.br"
+
+
+@app.middleware("http")
+async def redirecionar_dominio_antigo(request: Request, call_next):
+    if request.headers.get("host", "").split(":")[0] in DOMINIOS_ANTIGOS:
+        destino = f"https://{DOMINIO_CANONICO}{request.url.path}"
+        if request.url.query:
+            destino += f"?{request.url.query}"
+        return RedirectResponse(destino, status_code=301)
+    return await call_next(request)
+
 
 # ---------- credenciais por requisicao ----------
 
-_clients: dict = {}
-_clients_lock = threading.Lock()
+_env_client = None
+_env_client_lock = threading.Lock()
 
 
-def resolve_client(base_url: str | None, email: str | None, token: str | None):
-    """Monta (client, fingerprint, base_url) a partir de headers ou do .env."""
-    base_url = (base_url or ENV_BASE_URL or "").strip().rstrip("/")
-    email = (email or ENV_EMAIL or "").strip()
-    token = (token or ENV_TOKEN or "").strip()
-    if not (base_url and email and token):
-        raise HTTPException(401, "Credenciais do Jira nao configuradas — faca login.")
-    fp = hashlib.sha256(f"{base_url}|{email}|{token}".encode()).hexdigest()[:16]
-    with _clients_lock:
-        client = _clients.get(fp)
-        if client is None:
-            client = JiraClient(base_url, email, token)
-            _clients[fp] = client
-    return client, fp, base_url
+def env_client():
+    """Fallback para uso local: credenciais fixas no .env (API token)."""
+    global _env_client
+    if not (ENV_BASE_URL and ENV_EMAIL and ENV_TOKEN):
+        return None
+    base_url = ENV_BASE_URL.strip().rstrip("/")
+    with _env_client_lock:
+        if _env_client is None:
+            _env_client = JiraClient(base_url, ENV_EMAIL.strip(), ENV_TOKEN.strip())
+    fp = hashlib.sha256(f"{base_url}|{ENV_EMAIL}".encode()).hexdigest()[:16]
+    return _env_client, fp, base_url
 
 
-def client_dep(
-    x_jira_base_url: str | None = Header(None),
-    x_jira_email: str | None = Header(None),
-    x_jira_token: str | None = Header(None),
-):
-    return resolve_client(x_jira_base_url, x_jira_email, x_jira_token)
+def client_dep(sessao: str | None = Cookie(None)):
+    """(client, fingerprint, url do site) da sessao OAuth - ou do .env."""
+    s = oauth.obter_sessao(sessao)
+    if s is not None and s.site is not None:
+        try:
+            s.garantir_token()
+        except oauth.OAuthError:
+            # refresh_token expirado ou revogado em id.atlassian.com
+            oauth.encerrar_sessao(sessao)
+            raise HTTPException(401, "Sessao expirada — entre novamente.")
+        return s.client, s.fingerprint, s.site["url"]
+    ctx = env_client()
+    if ctx is None:
+        raise HTTPException(401, "Entre com a sua conta Atlassian.")
+    return ctx
 
 
 def jira_http_error(e: JiraError) -> HTTPException:
@@ -261,29 +295,123 @@ def get_report(
 # ---------- rotas ----------
 
 
-class LoginBody(BaseModel):
-    baseUrl: str
-    email: str
-    token: str
+# ---------- login com a Atlassian (OAuth 2.0 3LO) ----------
 
 
-@app.post("/api/login")
-def api_login(body: LoginBody):
-    client, fp, base_url = resolve_client(body.baseUrl, body.email, body.token)
+def _voltar_com_erro(msg: str) -> RedirectResponse:
+    return RedirectResponse("/app?" + urlencode({"login_error": msg}), status_code=303)
+
+
+def _escolher_site(s: "oauth.Sessao", site: dict) -> str | None:
+    """Liga a sessao a um site Jira. Devolve mensagem de erro ou None."""
+    client = JiraClient(oauth.API_BASE.format(cloud_id=site["id"]), bearer=s.access_token)
     try:
         me = client.myself()
-    except JiraError as e:
-        with _clients_lock:
-            _clients.pop(fp, None)
-        msg = str(e)
-        if "-> 401" in msg or "-> 403" in msg:
-            raise HTTPException(401, "E-mail ou API token invalidos.")
-        raise HTTPException(502, f"Nao consegui falar com {base_url}: {msg[:200]}")
-    return {
-        "accountId": me.get("accountId"),
-        "displayName": me.get("displayName"),
-        "baseUrl": base_url,
-    }
+    except JiraError:
+        return f"Nao consegui ler o Jira de {site['name']} com a autorizacao concedida."
+    s.site, s.client = site, client
+    s.account_id = me.get("accountId", "")
+    s.display_name = me.get("displayName", "")
+    return None
+
+
+def _cookie_sessao(resp: Response, sid: str):
+    resp.set_cookie(
+        oauth.COOKIE_SESSAO, sid, max_age=oauth.SESSAO_MAX_IDADE,
+        httponly=True, secure=True, samesite="lax",
+    )
+
+
+@app.get("/auth/login")
+def auth_login():
+    if not oauth.configurado():
+        return _voltar_com_erro("Login com a Atlassian nao configurado no servidor.")
+    state = secrets.token_urlsafe(24)
+    resp = RedirectResponse(oauth.url_autorizacao(state), status_code=303)
+    # samesite=lax: o cookie precisa voltar no redirect da Atlassian para o callback
+    resp.set_cookie(
+        oauth.COOKIE_STATE, state, max_age=600, path="/auth",
+        httponly=True, secure=True, samesite="lax",
+    )
+    return resp
+
+
+@app.get("/auth/callback")
+def auth_callback(
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
+    oauth_state: str | None = Cookie(None),
+):
+    if error:
+        return _voltar_com_erro("Autorizacao cancelada na Atlassian.")
+    if not (code and state and oauth_state and secrets.compare_digest(state, oauth_state)):
+        return _voltar_com_erro("O login expirou ou veio de outra aba — tente de novo.")
+    try:
+        tokens = oauth.trocar_code(code)
+        sites = oauth.sites_autorizados(tokens["access_token"])
+    except (oauth.OAuthError, KeyError):
+        return _voltar_com_erro("A Atlassian recusou o login — tente de novo.")
+    if not sites:
+        return _voltar_com_erro("Nenhum site Jira foi autorizado para o app.")
+
+    sid, s = oauth.criar_sessao(tokens, sites)
+    destino = "/auth/sites"
+    if len(sites) == 1:
+        erro = _escolher_site(s, sites[0])
+        if erro:
+            oauth.encerrar_sessao(sid)
+            return _voltar_com_erro(erro)
+        destino = "/app"
+
+    resp = RedirectResponse(destino, status_code=303)
+    _cookie_sessao(resp, sid)
+    resp.delete_cookie(oauth.COOKIE_STATE, path="/auth")
+    return resp
+
+
+@app.get("/auth/sites")
+def auth_sites(sessao: str | None = Cookie(None)):
+    """Escolha do site quando o usuario autorizou mais de um."""
+    s = oauth.obter_sessao(sessao)
+    if s is None:
+        return RedirectResponse("/", status_code=303)
+    botoes = "\n".join(
+        f'<form method="post" action="/auth/site/{html.escape(site["id"])}">'
+        f'<button class="btn primary" type="submit">{html.escape(site["name"])}</button> '
+        f'<span class="muted">{html.escape(site["url"])}</span></form>'
+        for site in s.sites
+    )
+    return HTMLResponse(f"""<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Escolha o site — Apontamentos de Horas</title>
+<link rel="stylesheet" href="/static/style.css"><link rel="stylesheet" href="/static/legal.css">
+</head><body><main class="legal">
+<h1>Escolha o site do Jira</h1>
+<p>Voce autorizou mais de um site. Qual deles quer consultar?</p>
+<div style="display:grid;gap:12px">{botoes}</div>
+</main></body></html>""")
+
+
+@app.post("/auth/site/{cloud_id}")
+def auth_site(cloud_id: str, sessao: str | None = Cookie(None)):
+    s = oauth.obter_sessao(sessao)
+    site = next((x for x in (s.sites if s else []) if x["id"] == cloud_id), None)
+    if site is None:
+        return RedirectResponse("/", status_code=303)
+    erro = _escolher_site(s, site)
+    if erro:
+        return _voltar_com_erro(erro)
+    return RedirectResponse("/app", status_code=303)
+
+
+@app.post("/auth/logout")
+def auth_logout(sessao: str | None = Cookie(None)):
+    oauth.encerrar_sessao(sessao)
+    resp = Response(status_code=204)
+    resp.delete_cookie(oauth.COOKIE_SESSAO)
+    return resp
 
 
 @app.get("/api/meta")
@@ -692,8 +820,33 @@ app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
 
 @app.get("/")
+def landing(sessao: str | None = Cookie(None)):
+    """Pagina publica; quem ja tem sessao vai direto para o painel."""
+    s = oauth.obter_sessao(sessao)
+    if s is not None and s.site is not None:
+        return RedirectResponse("/app", status_code=303)
+    return FileResponse(BASE_DIR / "static" / "landing.html")
+
+
+@app.get("/app")
 def index():
     return FileResponse(BASE_DIR / "static" / "index.html")
+
+
+# paginas institucionais exigidas pelo cadastro do app OAuth na Atlassian
+@app.get("/privacy")
+def privacy():
+    return FileResponse(BASE_DIR / "static" / "privacy.html")
+
+
+@app.get("/terms")
+def terms():
+    return FileResponse(BASE_DIR / "static" / "terms.html")
+
+
+@app.get("/contact")
+def contact():
+    return FileResponse(BASE_DIR / "static" / "contact.html")
 
 
 if __name__ == "__main__":

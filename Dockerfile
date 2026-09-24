@@ -5,7 +5,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app.py jira_client.py ./
+COPY app.py jira_client.py oauth.py ./
 COPY static ./static
 
 EXPOSE 8000

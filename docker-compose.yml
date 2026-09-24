@@ -2,11 +2,32 @@ services:
   jira-dashboard:
     build: .
     container_name: jira-dashboard
-    ports:
-      - "8000:8000"
+    # Sem publicar porta no host: o nginx-container (na mesma rede shared-net)
+    # faz o proxy reverso por nome de container -> http://jira-dashboard:8000
+    expose:
+      - "8000"
     # Opcional: credenciais fixas para pular a tela de login (uso pessoal).
     # Sem .env o app funciona normalmente com a tela de login.
     env_file:
       - path: .env
         required: false
+      # client id/secret do login com a Atlassian (OAuth) - ver oauth.py
+      - path: .env.oauth
+        required: false
     restart: unless-stopped
+    # Hot-reload em desenvolvimento: o codigo do host e espelhado dentro do
+    # container. Mudancas em static/ aparecem no proximo refresh do browser;
+    # mudancas em app.py/jira_client.py o uvicorn --reload recarrega sozinho.
+    volumes:
+      - ./app.py:/app/app.py
+      - ./jira_client.py:/app/jira_client.py
+      - ./oauth.py:/app/oauth.py
+      - ./static:/app/static
+    command: uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - shared-net
+
+networks:
+  shared-net:
+    name: shared-net
+    external: true
